@@ -17,7 +17,7 @@ class JointModel(torch.nn.Module):
         embedded_words = self.embedding(inputs)
         lstm_out, (h, c) = self.lstm(embedded_words)
 
-        sa_logit = self.sa_classifier(torch.mean(h))
+        sa_logit = self.sa_classifier(torch.mean(lstm_out,dim=1))
         ner_logits = self.ner_classifier(lstm_out)
 
         return ner_logits, sa_logit
