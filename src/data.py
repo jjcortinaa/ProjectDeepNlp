@@ -1,52 +1,57 @@
-from datasets import load_dataset
-import pandas as pd
-import os
-from transformers import pipeline
-import ast
-from transformers import pipeline
-
-
 import os
 import pandas as pd
-import ast
-from datasets import load_dataset
-from transformers import pipeline
+import torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer
 
-def download_data(path="../data/NER_csvs", sa_model_path="../data/SA_model", sa_tokenizer_path="../data/SA_tokenizer", output_path="../data/NER_SA_csvs"):
-    """
-    Downloads CoNLL-2003 dataset, saves CSVs, applies sentiment analysis, and stores labeled CSVs.
-    
-    Args:
-        path (str): Path to save NER CSVs.
-        sa_model_path (str): Path to save the SA model.
-        sa_tokenizer_path (str): Path to save the SA tokenizer.
-        output_path (str): Path to save the final CSVs with SA labels.
-    """
-    os.makedirs(path, exist_ok=True)
-    os.makedirs(output_path, exist_ok=True)
+class TextSentimentDataset(Dataset):
+    def __init__(self, dataframe, tokenizer_name="distilbert-base-uncased", max_length=128):
+        self.texts = dataframe["sentence"].tolist()
+        self.labels = [1 if label == "POSITIVE" else 0 for label in dataframe["label"]]
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self.max_length = max_length
 
-    # Load and save raw NER datasets
-    dataset = load_dataset("conll2003", trust_remote_code=True)
-    for split in ["train", "validation", "test"]:
-        df = pd.DataFrame(dataset[split])
-        df.to_csv(os.path.join(path, f"conll2003_{split}.csv"), index=False)
+    def __len__(self):
+        return len(self.texts)
 
-    # Load SA model and tokenizer
-    sentiment_analyzer = pipeline("sentiment-analysis")
-    sentiment_analyzer.model.save_pretrained(sa_model_path)
-    sentiment_analyzer.tokenizer.save_pretrained(sa_tokenizer_path)
+    def __getitem__(self, idx):
+        text = self.texts[idx]
+        label = torch.tensor(self.labels[idx], dtype=torch.long)
 
-    # Reload with local model (opcional, puede omitirse si ya se tiene arriba)
-    sentiment_analyzer = pipeline("sentiment-analysis", model=sa_model_path, tokenizer=sa_tokenizer_path)
+        encoding = self.tokenizer(
+            text,
+            padding="max_length",
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt"
+        )
 
-    for split in ["train", "validation", "test"]:
-        df = pd.read_csv(os.path.join(path, f"conll2003_{split}.csv"))
-        df["sentence"] = df["tokens"].apply(ast.literal_eval).apply(lambda x: " ".join(x))
-        sentences = df["sentence"].tolist()
+        return {
+            "input_ids": encoding["input_ids"].squeeze(0),
+            "attention_mask": encoding["attention_mask"].squeeze(0),
+            "label": label
+        }
 
-        # Predict SA labels
-        results = sentiment_analyzer(sentences)
-        df["label"] = [r["label"] for r in results]
 
-        # Save final CSV
-        df.to_csv(os.path.join(output_path, f"{split}.csv"), index=False)
+def load_sentiment_dataloaders(data_path="../data/NER_SA_csvs", batch_size=32):
+    df_train = pd.read_csv(os.path.join(data_path, "train.csv"))
+    df_val = pd.read_csv(os.path.join(data_path, "validation.csv"))
+    df_test = pd.read_csv(os.path.join(data_path, "test.csv"))
+
+    train_dataset = TextSentimentDataset(df_train)
+    val_dataset = TextSentimentDataset(df_val)
+    test_dataset = TextSentimentDataset(df_test)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size)
+
+    return train_loader, val_loader, test_loader
+
+
+if __name__ == "__main__":
+    train_loader, val_loader, test_loader = load_sentiment_dataloaders()
+    batch = next(iter(train_loader))
+    print("Input IDs shape:", batch["input_ids"].shape)
+    print("Attention Mask shape:", batch["attention_mask"].shape)
+    print("Labels shape:", batch["label"].shape)
