@@ -3,7 +3,7 @@ from torch import optim
 from tqdm import tqdm
 import numpy as np
 import data
-from models import JointModelfunc, LossJointModel
+import JointModelfunc, LossJointModel
 
 def train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1.0, beta=1.0, device=None):
     # Asegúrate de mover el modelo al dispositivo correcto (CPU o GPU)

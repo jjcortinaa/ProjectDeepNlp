@@ -12,7 +12,7 @@ class JointModel(torch.nn.Module):
         self.ner_classifier: nn.Linear = nn.Linear(in_features=hidden_dim *2, out_features=num_ner_tags)
         self.sa_classifier: nn.Linear = nn.Linear(in_features=hidden_dim *2, out_features=num_sa_tags)
 
-    def forward(self, inputs: torch.Tensor)->Tuple([torch.Tensor, torch.Tensor]): # type: ignore
+    def forward(self, inputs: torch.Tensor)->Tuple[torch.Tensor, torch.Tensor]: # type: ignore
         #inputs has to contain word idxs
         embedded_words = self.embedding(inputs)
         lstm_out, (h, c) = self.lstm(embedded_words)

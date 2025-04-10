@@ -51,7 +51,7 @@ class NERSentimentEmbeddingDataset(Dataset):
         }
 
 
-def load_sentiment_dataloaders(data_path="../data/NER_SA_csvs", batch_size=32):
+def load_sentiment_dataloaders(data_path="data/NER_SA_csvs", batch_size=32):
     df_train = pd.read_csv(os.path.join(data_path, "train.csv"))
     df_val = pd.read_csv(os.path.join(data_path, "validation.csv"))
     df_test = pd.read_csv(os.path.join(data_path, "test.csv"))
@@ -67,9 +67,3 @@ def load_sentiment_dataloaders(data_path="../data/NER_SA_csvs", batch_size=32):
     return train_loader, val_loader, test_loader
 
 
-if __name__ == "__main__":
-    train_loader, val_loader, test_loader = load_sentiment_dataloaders()
-    batch = next(iter(train_loader))
-    print("Tokens:", batch["tokens"])
-    print("Embeddings shape:", batch["embeddings"].shape)
-    print("Labels shape:", batch["label"].shape)
