@@ -5,6 +5,7 @@ from typing import Tuple
 class JointModel(torch.nn.Module):
 
     def __init__(self, embedding_weights: torch.Tensor, hidden_dim: int, num_layers: int, num_ner_tags: int = 8, num_sa_tags: int = 2):
+        super().__init__()
 
         self.embedding: nn.Embedding = nn.Embedding.from_pretrained(embedding_weights, freeze=True)
         self.lstm: nn.LSTM = nn.LSTM(embedding_weights.shape[1], hidden_size=hidden_dim, num_layers=num_layers, bidirectional=True)

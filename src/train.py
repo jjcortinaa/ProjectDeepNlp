@@ -8,7 +8,7 @@ import JointModelfunc, LossJointModel
 def train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1.0, beta=1.0, device=None):
     # Asegúrate de mover el modelo al dispositivo correcto (CPU o GPU)
     if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("mps" if torch.cuda.is_available() else "cpu")
     
     model.to(device)
 
@@ -27,8 +27,9 @@ def train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1
         # Iteramos sobre el DataLoader de entrenamiento
         for batch in tqdm(train_loader, desc=f"Epoch {epoch + 1}/{num_epochs} - Training"):
             # Cargar datos en el dispositivo
+            labels = batch['labels'].to(device)
             input_ids = batch['input_ids'].to(device)
-            labels = batch['label'].to(device)
+            
 
             # Propagación hacia adelante
             optimizer.zero_grad()  # Limpiar los gradientes del optimizador
