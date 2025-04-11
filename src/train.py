@@ -104,6 +104,7 @@ def validate_model(model, val_loader, device):
 
             # Medir la precisión de NER
             ner_preds = torch.argmax(ner_logits, dim=-1)
+            print(ner_preds)
             mask = input_ids != -100  # Ignorar los tokens de padding
             correct_ner += torch.sum((ner_preds == ner_tags) & mask)
             total_ner += mask.sum().item()
@@ -127,4 +128,4 @@ if __name__ == "__main__":
 
 
     # Entrenar el modelo
-    train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.0, beta=1.0)
+    train_model(model, train_loader, val_loader, num_epochs=3, lr=1e-5, alpha=1.0, beta=1.0)

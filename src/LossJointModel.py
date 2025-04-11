@@ -17,7 +17,7 @@ def joint_loss(
     ner_labels_flat = ner_labels.view(-1)                       # (batch * seq_len)
 
     # CrossEntropy para NER con padding ignorado
-    loss_ner = nn.CrossEntropyLoss(ignore_index=-100)(ner_logits_flat, ner_labels_flat)
+    loss_ner = nn.CrossEntropyLoss(weight=torch.Tensor([1,20,20,20,20,10,20,20,20]),ignore_index=-100)(ner_logits_flat, ner_labels_flat)
 
     # CrossEntropy para SA
     loss_sa = nn.CrossEntropyLoss()(sa_logits, sa_labels)
