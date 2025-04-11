@@ -5,6 +5,7 @@ import numpy as np
 import data
 import JointModelfunc, LossJointModel
 from gensim.models import KeyedVectors
+from utils import save_model
 
 
 
@@ -72,6 +73,8 @@ def train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.
         val_loss, val_sa_accuracy, val_ner_accuracy = validate_model(model, val_loader, device)
         print(f"Epoch {epoch + 1} - Validation loss: {val_loss:.4f} | "
               f"Validation SA Accuracy: {val_sa_accuracy:.2f}% | Validation NER Accuracy: {val_ner_accuracy:.2f}%")
+    
+    save_model(model, "best_model")
 
 def validate_model(model, val_loader, device):
     model.eval()  # Establecer el modelo en modo de evaluación
@@ -108,6 +111,7 @@ def validate_model(model, val_loader, device):
             mask = input_ids != -100  # Ignorar los tokens de padding
             correct_ner += torch.sum((ner_preds == ner_tags) & mask)
             total_ner += mask.sum().item()
+        
 
     # Promediamos la pérdida en todas las iteraciones
     avg_val_loss = val_loss / len(val_loader)
@@ -128,4 +132,4 @@ if __name__ == "__main__":
 
 
     # Entrenar el modelo
-    train_model(model, train_loader, val_loader, num_epochs=3, lr=1e-5, alpha=1.0, beta=1.0)
+    train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.0, beta=1.0)
