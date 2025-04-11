@@ -2,14 +2,14 @@ import os
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
-from gensim.models import KeyedVectors
+
 import numpy as np
 import ast
 from torch.nn.utils.rnn import pad_sequence
 import torch
 
 class NERSentimentEmbeddingDataset(Dataset):
-    def __init__(self, dataframe, w2v_path="models/GoogleNews-vectors-negative300.bin.gz"):
+    def __init__(self, dataframe,embeddings):
         self.tokens = dataframe["tokens"].apply(ast.literal_eval).tolist()
         self.pos_tags = dataframe["pos_tags"].apply(ast.literal_eval).tolist()
         self.chunk_tags = dataframe["chunk_tags"].apply(ast.literal_eval).tolist()
@@ -18,7 +18,7 @@ class NERSentimentEmbeddingDataset(Dataset):
         self.labels = [1 if label == "POSITIVE" else 0 for label in dataframe["label"]]
 
         # Cargar el modelo de Word2Vec
-        self.word2vec = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
+        self.word2vec = embeddings
         self.embedding_dim = self.word2vec.vector_size
 
         # Crear vocabulario
@@ -67,26 +67,29 @@ def collate_fn(batch):
     input_ids = [item["input_ids"] for item in batch]  # Añadimos 'input_ids'
     embeddings = [item["embeddings"] for item in batch]
     labels = torch.stack([item["label"] for item in batch])
+    ner_tags = [torch.tensor(item["ner_tags"]) for item in batch]
 
     # Realizar padding en las secuencias de input_ids y embeddings
     padded_input_ids = pad_sequence(input_ids, batch_first=True, padding_value=0)
     padded_embeddings = pad_sequence(embeddings, batch_first=True, padding_value=0)
+    padded_ner_tags = pad_sequence(ner_tags, batch_first=True, padding_value=0)
 
     return {
         "input_ids": padded_input_ids,  # Asegúrate de devolver 'input_ids'
         "embeddings": padded_embeddings,
-        "labels": labels
+        "labels": labels,
+        "ner_tags":padded_ner_tags
     }
 
 
-def load_sentiment_dataloaders(data_path="data/NER_SA_csvs", batch_size=24):
+def load_sentiment_dataloaders(embeddings, data_path="data/NER_SA_csvs", batch_size=3):
     df_train = pd.read_csv(os.path.join(data_path, "train.csv"))
     df_val = pd.read_csv(os.path.join(data_path, "validation.csv"))
     df_test = pd.read_csv(os.path.join(data_path, "test.csv"))
 
-    train_dataset = NERSentimentEmbeddingDataset(df_train)
-    val_dataset = NERSentimentEmbeddingDataset(df_val)
-    test_dataset = NERSentimentEmbeddingDataset(df_test)
+    train_dataset = NERSentimentEmbeddingDataset(df_train, embeddings=embeddings)
+    val_dataset = NERSentimentEmbeddingDataset(df_val, embeddings=embeddings)
+    test_dataset = NERSentimentEmbeddingDataset(df_test, embeddings=embeddings)
 
     # Aquí se pasa la función collate_fn para el padding
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)

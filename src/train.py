@@ -4,8 +4,11 @@ from tqdm import tqdm
 import numpy as np
 import data
 import JointModelfunc, LossJointModel
+from gensim.models import KeyedVectors
 
-def train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1.0, beta=1.0, device=None):
+
+
+def train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.0, beta=1.0, device=None):
     # Asegúrate de mover el modelo al dispositivo correcto (CPU o GPU)
     if device is None:
         device = torch.device("mps" if torch.cuda.is_available() else "cpu")
@@ -29,6 +32,7 @@ def train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1
             # Cargar datos en el dispositivo
             labels = batch['labels'].to(device)
             input_ids = batch['input_ids'].to(device)
+            ner_tags = batch['ner_tags'].to(device)
             
 
             # Propagación hacia adelante
@@ -37,7 +41,7 @@ def train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1
 
             # Cálculo de la pérdida
             loss, loss_ner, loss_sa = LossJointModel.joint_loss(
-                ner_logits, sa_logits, ner_labels=input_ids, sa_labels=labels, alpha=alpha, beta=beta
+                ner_logits, sa_logits, ner_labels=ner_tags, sa_labels=labels, alpha=alpha, beta=beta
             )
             train_loss += loss.item()
 
@@ -53,7 +57,7 @@ def train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1
             # Medir la precisión de NER
             ner_preds = torch.argmax(ner_logits, dim=-1)
             mask = input_ids != -100  # Ignorar los tokens de padding
-            correct_ner += (ner_preds == input_ids) & mask
+            correct_ner += torch.sum((ner_preds == ner_tags) & mask)
             total_ner += mask.sum().item()
 
         # Promediamos la pérdida en todas las iteraciones
@@ -81,15 +85,15 @@ def validate_model(model, val_loader, device):
         for batch in tqdm(val_loader, desc="Validating"):
             # Cargar datos en el dispositivo
             input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['label'].to(device)
+            labels = batch['labels'].to(device)
+            ner_tags = batch['ner_tags'].to(device)
 
             # Propagación hacia adelante
             ner_logits, sa_logits = model(input_ids)
 
             # Cálculo de la pérdida
             loss, loss_ner, loss_sa = LossJointModel.joint_loss(
-                ner_logits, sa_logits, ner_labels=input_ids, sa_labels=labels
+                ner_logits, sa_logits, ner_labels=ner_tags, sa_labels=labels
             )
             val_loss += loss.item()
 
@@ -101,7 +105,7 @@ def validate_model(model, val_loader, device):
             # Medir la precisión de NER
             ner_preds = torch.argmax(ner_logits, dim=-1)
             mask = input_ids != -100  # Ignorar los tokens de padding
-            correct_ner += (ner_preds == input_ids) & mask
+            correct_ner += torch.sum((ner_preds == ner_tags) & mask)
             total_ner += mask.sum().item()
 
     # Promediamos la pérdida en todas las iteraciones
@@ -112,12 +116,15 @@ def validate_model(model, val_loader, device):
     return avg_val_loss, val_sa_accuracy, val_ner_accuracy
 
 if __name__ == "__main__":
+    w2v_path="models/GoogleNews-vectors-negative300.bin.gz"
+    embedding_weights = KeyedVectors.load_word2vec_format(w2v_path, binary=True) # Ejemplo, deberías cargar embeddings reales
     # Cargar datos
-    train_loader, val_loader, test_loader = data.load_sentiment_dataloaders()
+    train_loader, val_loader, test_loader = data.load_sentiment_dataloaders(embedding_weights)
     
     # Cargar el modelo con los embeddings (tendrás que tener los embeddings pre-entrenados)
-    embedding_weights = torch.randn(10000, 300)  # Ejemplo, deberías cargar embeddings reales
-    model = JointModelfunc.JointModel(embedding_weights, hidden_dim=256, num_layers=2)
+    embedding_weights = torch.tensor(embedding_weights.vectors, dtype=torch.float32)
+    model = JointModelfunc.JointModel(hidden_dim=256, num_layers=2, embedding_weights=embedding_weights)
+
 
     # Entrenar el modelo
-    train_model(model, train_loader, val_loader, num_epochs=10, lr=1e-5, alpha=1.0, beta=1.0)
+    train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.0, beta=1.0)
