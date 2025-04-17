@@ -5,7 +5,7 @@ import numpy as np
 import data
 import JointModelfunc, LossJointModel
 from gensim.models import KeyedVectors
-from utils import save_model
+from utils import save_model, predict_alert
 
 
 
@@ -34,6 +34,7 @@ def train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.
             labels = batch['labels'].to(device)
             input_ids = batch['input_ids'].to(device)
             ner_tags = batch['ner_tags'].to(device)
+
             
 
             # Propagación hacia adelante
@@ -61,6 +62,8 @@ def train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.
             correct_ner += torch.sum((ner_preds == ner_tags) & mask)
             total_ner += mask.sum().item()
 
+            #predict_alert(sa_logits, train_loader,input_ids,ner_tags)
+
         # Promediamos la pérdida en todas las iteraciones
         avg_train_loss = train_loss / len(train_loader)
         train_sa_accuracy = 100 * correct_sa / total_sa
@@ -83,6 +86,10 @@ def validate_model(model, val_loader, device):
     total_sa = 0
     correct_ner = 0
     total_ner = 0
+
+    # Contadores para cada etiqueta de NER
+    ner_correct_counts = {i: 0 for i in range(9)}  # De 0 a 8
+    ner_total_counts = {i: 0 for i in range(9)}  # De 0 a 8
 
     with torch.no_grad():  # No necesitamos calcular gradientes durante la validación
         for batch in tqdm(val_loader, desc="Validating"):
@@ -110,14 +117,29 @@ def validate_model(model, val_loader, device):
             mask = input_ids != -100  # Ignorar los tokens de padding
             correct_ner += torch.sum((ner_preds == ner_tags) & mask)
             total_ner += mask.sum().item()
-        
+
+            # Contar aciertos por cada clase de NER
+            for i in range(9):  # Para cada clase de NER (0 a 8)
+                ner_correct_counts[i] += torch.sum((ner_preds == i) & (ner_tags == i) & mask).item()
+                ner_total_counts[i] += torch.sum((ner_tags == i) & mask).item()
+
+    # Calcular el porcentaje de precisión por cada clase de NER
+    ner_accuracy_per_class = {
+        i: (100 * ner_correct_counts[i] / ner_total_counts[i] if ner_total_counts[i] > 0 else 0)
+        for i in range(9)
+    }
 
     # Promediamos la pérdida en todas las iteraciones
     avg_val_loss = val_loss / len(val_loader)
     val_sa_accuracy = 100 * correct_sa / total_sa
     val_ner_accuracy = 100 * correct_ner / total_ner
 
+    # Mostrar las precisiones por cada clase de NER
+    for i in range(9):
+        print(f"NER class {i}: {ner_accuracy_per_class[i]:.2f}% total: {ner_total_counts[i]} correct: {ner_correct_counts[i]}")
+
     return avg_val_loss, val_sa_accuracy, val_ner_accuracy
+
 
 if __name__ == "__main__":
     w2v_path="models/GoogleNews-vectors-negative300.bin.gz"
@@ -131,4 +153,4 @@ if __name__ == "__main__":
 
 
     # Entrenar el modelo
-    train_model(model, train_loader, val_loader, num_epochs=1, lr=1e-5, alpha=1.0, beta=1.0)
+    train_model(model, train_loader, val_loader, num_epochs=8, lr=1e-5, alpha=1.0, beta=1.0)

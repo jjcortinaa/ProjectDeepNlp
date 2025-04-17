@@ -23,6 +23,7 @@ class NERSentimentEmbeddingDataset(Dataset):
 
         # Crear vocabulario
         self.vocab = {word: idx for idx, word in enumerate(self.word2vec.index_to_key)}
+        self.vocab_aux = {idx: word for idx, word in enumerate(self.word2vec.index_to_key)}
 
     def __len__(self):
         return len(self.tokens)
